@@ -19,6 +19,7 @@ class DatabaseHandler:
         else:
             self.sql = sqlite.connect(file)
         self.cur = self.sql.cursor()
+        self.logging_guilds = []
 
     def refresh_sql_cnx(self):
         self.sql.commit()
@@ -112,6 +113,11 @@ class DatabaseHandler:
         self.cur.execute(f"DELETE FROM messages WHERE id=\"{id}\" AND guild_id=\"{guild_id}\"")
         self.sql.commit()
 
+    def delete_guild_messages(self, guild_id:str):
+        self.refresh_sql_cnx()
+        self.cur.execute(f"DELETE FROM messages WHERE guild_id=\"{guild_id}\"")
+        self.sql.commit()
+
     def add_command_alias(self, guild_id:str, alias_name:str, response:str):
         self.refresh_sql_cnx()
         self.cur.execute("INSERT INTO aliases(id, guild_id, alias, response) VALUES (\"%s\", \"%s\", \"%s\", \"%s\")" % ("SELECT COUNT(*)+1 FROM aliases", guild_id, alias_name, response))
@@ -148,4 +154,29 @@ class DatabaseHandler:
         headers = [i[0] for i in self.cur.description]
         resp = self.cur.fetchall()
 
+    def is_guild_logging(self, guild_id:str, force_renew:bool=False) -> bool:
+        if guild_id in self.logging_guilds and not force_renew:
+            return True
+        self.refresh_sql_cnx()
+        self.cur.execute("SELECT guild_id FROM event_history WHERE event_type=13")
+        self.logging_guilds = [i[0] for i in self.cur.fetchall()]
+        return guild_id in self.logging_guilds
 
+    def create_amazon_tag(self, guild_id:str, endian:str=""):
+        self.refresh_sql_cnx()
+        self.cur.execute("INSERT INTO AmazonLinks(guild_id, link_endian) VALUES (\"{guild_id}\",\"{endian}\")")
+        self.sql.commit()
+
+    def get_amazon_tag(self, guild_id:str) -> str:
+        self.refresh_sql_cnx()
+        self.cur.execute(f"SELECT link_endian FROM AmazonLinks WHERE guild_id=\"{guild_id}\" ORDER BY id desc LIMIT 1")
+        resp = self.cur.fetchone()[0]
+        self.sql.commit()
+        return resp
+
+    def get_amazon_chat_override(self, guild_id:str) -> bool:
+        self.refresh_sql_cnx()
+        self.cur.execute(f"SELECT override FROM AmazonLinks WHERE guild_id=\"{guild_id}\" ORDER BY id desc LIMIT 1")
+        resp = self.cur.fetchone()[0]
+        self.sql.commit()
+        return resp == 1
