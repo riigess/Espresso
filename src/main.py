@@ -322,7 +322,7 @@ async def invite(interaction:discord.Interaction):
 @tree.command()
 async def github(interaction:discord.Interaction):
     """Requests the GitHub link for the project for this discord bot"""
-    embed = discord.Embed(title="Check me out on GitHub!", url="https://github.com/riigess/Luna")
+    embed = discord.Embed(title="Check me out on GitHub!", url="https://github.com/riigess/Espresso")
     embed.set_thumbnail(url='https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png')
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
