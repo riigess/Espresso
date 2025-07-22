@@ -167,3 +167,5 @@ database.sqlite
 .gradle/
 .idea/
 settings.properties
+src/database.sqlite.exodus
+config.json.deployed
