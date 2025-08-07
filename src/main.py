@@ -141,15 +141,18 @@ async def on_message_delete(message):
     if dbh.is_guild_logging(str(message.guild.id), force_renew=True):
         guild_channel = dbh.get_guild_logging_channel(message.guild.id)
         if guild_channel is not None:
-            name = message.author.nick
-            if type(name) is type(None):
-                name = message.author.name
-            name += "#%s" % message.author.discriminator
+            name = message.author.name
+            if message.author.discriminator != "0":
+                name += "#%s" % message.author.discriminator
             embed = discord.Embed(color=delete_color)
             embed.add_field(name="Deleted Message", value=message.content, inline=False)
             embed.add_field(name="Message ID", value=message.id, inline=False)
             embed.add_field(name="Channel", value=message.channel.mention)
-            embed.set_footer(text="%s | %s" % (name, datetime.now().strftime(string_time)))
+            nick = message.author.nick
+            if nick == None:
+                nick = ""
+            embed.add_field(name="Nickname", value=nick)
+            embed.set_footer(text=f"{name} | {datetime.now().strftime(string_time)}")
             channel = await message.guild.fetch_channel(guild_channel)
             await channel.send('', embed=embed)
             dbh.new_event(DatabaseEventType.message_deleted, message.guild.id, message.channel.id, False, False, datetime.now())
