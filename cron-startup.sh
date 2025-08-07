@@ -1,16 +1,17 @@
 #!/bin/bash
 
-proj_dir="/root/code"
+proj_dir=$(dirname "$0")
+proj_name="Espresso"
 
 runner() {
-    cd $proj_dir/Luna
-    if [ -f .luna-venv/bin/activate ]; then
-        echo ".luna-venv exists (check passed)"
-        source .luna-venv/bin/activate
+    cd $proj_dir/$proj_name
+    if [ -f .venv/bin/activate ]; then
+        echo ".venv exists (check passed)"
+        source .venv/bin/activate
     else
-        echo ".luna-venv does not exist (check not passed)"
-        python3 -m venv .luna-venv
-        source .luna-venv/bin/activate
+        echo ".venv does not exist (check not passed)"
+        python3 -m venv .venv
+        source .venv/bin/activate
         pip3 install -r requirements.txt
     fi
     echo "Updating directory with git"
@@ -22,7 +23,7 @@ runner() {
 }
 
 # If there is nothing running in /root/luna/src
-if [[ -z "$(ps -auxe | grep "python3" | grep "PWD=$proj_dir/Luna/src" | grep -v grep)" ]]; then
+if [[ -z "$(ps -auxe | grep "python3" | grep "PWD=$proj_dir/$proj_name/src" | grep -v grep)" ]]; then
     runner
 else
     echo "Already running"
