@@ -27,7 +27,7 @@ string_time = "%d-%m-%Y %H:%M:%S"
 dbh = DatabaseHandler()
 
 command = {}
-MY_GUILD = discord.Object(id=1305938554312200242)
+MY_GUILD = discord.Object(id=1375334654642487306)
 
 class MyClient(discord.Client):
     def __init__(self, *, intents:discord.Intents):
