@@ -88,7 +88,7 @@ async def on_message(message):
     # Only note that a message was noticed, but no content about the message (just what guild, channel, and when)
     dbh.new_event(DatabaseEventType.message_received, message.guild.id, message.channel.id, False, False, message.created_at)
     # If the guild is logging, then store that message..
-    if dbh.is_guild_logging(message.guild.id):
+    if dbh.is_guild_logging(str(message.guild.id)):
         dbh.new_message(message.id, message.guild.id, message.channel.id, message.author.id, message.created_at, message.content.replace("\"", "'"))
     content = message.content
     if not message.author.bot and dbh.get_amazon_chat_override(message.guild.id) and len(dbh.get_amazon_tag(message.guild.id)) > 0:
@@ -138,7 +138,7 @@ async def on_message_edit(before, after):
 
 @client.event
 async def on_message_delete(message):
-    if dbh.is_guild_logging(message.guild.id, force_renew=True):
+    if dbh.is_guild_logging(str(message.guild.id), force_renew=True):
         guild_channel = dbh.get_guild_logging_channel(message.guild.id)
         if guild_channel is not None:
             name = message.author.nick
@@ -154,44 +154,44 @@ async def on_message_delete(message):
             await channel.send('', embed=embed)
             dbh.new_event(DatabaseEventType.message_deleted, message.guild.id, message.channel.id, False, False, datetime.now())
 
-@client.event
-async def on_raw_message_delete(payload):
-    if dbh.is_guild_logging(str(payload.guild_id)):
-        guild_channel = dbh.get_guild_logging_channel(str(payload.guild_id))
-        if guild_channel is not None:
-            guild_channel = int(guild_channel)
-            msg = dbh.get_message(str(payload.message_id), str(payload.guild_id))
-            await asyncio.sleep(3)
-            last_message = None
-            async for message in client.get_channel(guild_channel).history(limit=10):
-                if message.author == client.user:
-                    if len(message.embeds) == 1:
-                        if len(message.embeds[0].fields) >= 2:
-                            for i in range(len(message.embeds[0].fields)):
-                                if "Message ID" in message.embeds[0].fields[i].name:
-                                    if str(message.embeds[0].fields[i].value) in str(payload.message_id):
-                                        last_message = message
-            if type(last_message) is type(None):
-                if type(msg) is not type(None):
-                    embed = discord.Embed(color=delete_color, title="Message deleted")
-                    embed.add_field(name="Message content", value="%s" % msg["content"])
-                    user = client.get_user(msg['author_id'])
-                    if type(user) is type(None):
-                        user = client.get_guild(payload.guild_id).get_member(msg['author_id'])
-                    if type(user) is not type(None):
-                        embed.set_footer(text="Author - %s#%s" % (user.name, str(user.discriminator)))
-                    else:
-                        embed.set_footer(text='Author ID: %s' % msg['author_id'])
-                    channel = client.get_channel(guild_channel)
-                    await channel.send('', embed=embed)
-                else:
-                    embed = discord.Embed(color=delete_color, title="Old message deleted")
-                    embed.add_field(name="Deleted Message", value="ID: %s" % payload.message_id)
-                    embed.add_field(name="Deleted in Channel", value="ID: %s" % payload.channel_id)
-                    channel = client.get_channel(guild_channel)
-                    await channel.send('', embed=embed)
-                dbh.new_event(DatabaseEventType.message_deleted, payload.message_id, payload.channel_id, False, False, datetime.now())
-            dbh.delete_message(payload.message_id, payload.guild_id)
+# @client.event
+# async def on_raw_message_delete(payload):
+#     if dbh.is_guild_logging(str(payload.guild_id)):
+#         guild_channel = dbh.get_guild_logging_channel(str(payload.guild_id))
+#         if guild_channel is not None:
+#             guild_channel = int(guild_channel)
+#             msg = dbh.get_message(str(payload.message_id), str(payload.guild_id))
+#             await asyncio.sleep(3)
+#             last_message = None
+#             async for message in client.get_channel(guild_channel).history(limit=10):
+#                 if message.author == client.user:
+#                     if len(message.embeds) == 1:
+#                         if len(message.embeds[0].fields) >= 2:
+#                             for i in range(len(message.embeds[0].fields)):
+#                                 if "Message ID" in message.embeds[0].fields[i].name:
+#                                     if str(message.embeds[0].fields[i].value) in str(payload.message_id):
+#                                         last_message = message
+#             if type(last_message) is type(None):
+#                 if type(msg) is not type(None):
+#                     embed = discord.Embed(color=delete_color, title="Message deleted")
+#                     embed.add_field(name="Message content", value="%s" % msg["content"])
+#                     user = client.get_user(msg['author_id'])
+#                     if type(user) is type(None):
+#                         user = client.get_guild(payload.guild_id).get_member(msg['author_id'])
+#                     if type(user) is not type(None):
+#                         embed.set_footer(text="Author - %s#%s" % (user.name, str(user.discriminator)))
+#                     else:
+#                         embed.set_footer(text='Author ID: %s' % msg['author_id'])
+#                     channel = client.get_channel(guild_channel)
+#                     await channel.send('', embed=embed)
+#                 else:
+#                     embed = discord.Embed(color=delete_color, title="Old message deleted")
+#                     embed.add_field(name="Deleted Message", value="ID: %s" % payload.message_id)
+#                     embed.add_field(name="Deleted in Channel", value="ID: %s" % payload.channel_id)
+#                     channel = client.get_channel(guild_channel)
+#                     await channel.send('', embed=embed)
+#                 dbh.new_event(DatabaseEventType.message_deleted, payload.message_id, payload.channel_id, False, False, datetime.now())
+#             dbh.delete_message(payload.message_id, payload.guild_id)
 
 @client.event
 async def on_member_join(member):

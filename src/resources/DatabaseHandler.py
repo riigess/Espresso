@@ -51,29 +51,23 @@ class DatabaseHandler:
     #             to_return.update({headers[i]:resp[i]})
     #     return to_return
 
-    def is_guild_logging(self, guild_id: str) -> bool:
+    def get_guild_logging_channel(self, guild_id: str) -> list:
         self.refresh_sql_cnx()
-        self.cur.execute(
-            f"SELECT * FROM event_view WHERE name=\"enabled logging in guild\" AND guild_id=\"{guild_id}\" LIMIT 1")
-        resp = self.cur.fetchone()
-        return len(resp) > 0
-
-    def get_guild_logging_channel(self, guild_id: str):
-        self.refresh_sql_cnx()
-        self.cur.execute(
-            f"SELECT * FROM event_history WHERE event_type=9 AND guild_id=\"{guild_id}\" ORDER BY date DESC LIMIT 1")
-        headers = [i[0]
-                   for i in self.cur.description]  # Fetch table column names
+        self.cur.execute(f"SELECT * FROM event_history WHERE event_type=9 AND guild_id=\"{guild_id}\" ORDER BY date DESC LIMIT 1")
+        headers = [i[0] for i in self.cur.description]  # Fetch table column names
         idx = headers.index('channel_id')  # Get channel_id column
-        resp = self.cur.fetchone()  # Get most recently set logging channel for guild_id
+        resp = self.cur.fetchall()  # Get most recently set logging channel for guild_id
         if len(resp) > 0:
-            return resp[idx]
-        return None
+            return resp[0][idx]
+        return []
 
     def set_guild_logging_channel(self, guild_id: str, channel_id: str, date: datetime):
         self.refresh_sql_cnx()
-        self.cur.execute("INSERT INTO event_history(event_type, guild_id, channel_id, is_voice_channel, is_private_message, date) VALUES (%i, \"%s\", \"%s\", False, False, \"%s\")" % (
-            DatabaseEventType.enabled_logging_in_guild.value, guild_id, channel_id, date.strftime("%Y-%m-%d %H:%M:%S")))
+        self.logging_guilds.append(guild_id)
+        self.cur.execute(f"DELETE FROM event_history WHERE guild_id=\"{guild_id}\" AND event_type={DatabaseEventType.enabled_logging_in_guild.value};")
+        self.cur.execute(f"INSERT INTO event_view(name, guild_id) VALUES (\"enabled logging in guild\", \"{guild_id}\");")
+        timestamp = date.strftime("%Y-%m-%d %H:%M:%S")
+        self.cur.execute(f"INSERT INTO event_history(event_type, guild_id, channel_id, is_voice_channel, is_private_message, date) VALUES ({DatabaseEventType.enabled_logging_in_guild.value}, \"{guild_id}\", \"{channel_id}\", False, False, \"{timestamp}\")")
         self.sql.commit()
 
     def add_server(self, id: str, owner_id: str, splash_url: str, banner_url: str, icon_url: str):
@@ -175,12 +169,20 @@ class DatabaseHandler:
         headers = [i[0] for i in self.cur.description]
         resp = self.cur.fetchall()
 
+
+    # def is_guild_logging(self, guild_id: str) -> bool:
+    #     self.refresh_sql_cnx()
+    #     self.cur.execute(f"SELECT * FROM event_view WHERE name=\"enabled logging in guild\" AND guild_id=\"{guild_id}\" LIMIT 1")
+    #     resp = self.cur.fetchall()
+    #     print("RESP:", resp)
+    #     return len(resp) > 0
+
     def is_guild_logging(self, guild_id: str, force_renew: bool = False) -> bool:
         if guild_id in self.logging_guilds and not force_renew:
             return True
         self.refresh_sql_cnx()
         self.cur.execute(
-            "SELECT guild_id FROM event_history WHERE event_type=13")
+            "SELECT DISTINCT guild_id FROM event_history WHERE event_type=9;")
         self.logging_guilds = [i[0] for i in self.cur.fetchall()]
         return guild_id in self.logging_guilds
 
