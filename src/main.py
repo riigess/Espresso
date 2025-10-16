@@ -27,16 +27,16 @@ string_time = "%d-%m-%Y %H:%M:%S"
 dbh = DatabaseHandler()
 
 command = {}
-MY_GUILD = discord.Object(id=1375334654642487306)
+#MY_GUILD = discord.Object(id=1375334654642487306)
 
 class MyClient(discord.Client):
     def __init__(self, *, intents:discord.Intents):
         super().__init__(intents=intents)
         self.tree = app_commands.CommandTree(self)
 
-    async def setup_hook(self):
-        self.tree.copy_global_to(guild=MY_GUILD)
-        await self.tree.sync(guild=MY_GUILD)
+#    async def setup_hook(self):
+#        self.tree.copy_global_to(guild=MY_GUILD)
+#        await self.tree.sync(guild=MY_GUILD)
 
 class custom_guild(Snowflake):
     def __init__(self, id):
