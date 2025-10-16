@@ -6,6 +6,7 @@ from discord import app_commands
 from discord.abc import Snowflake
 import requests
 import argparse
+import re
 
 from resources.DatabaseHandler import DatabaseHandler
 from resources.DatabaseHandler import DatabaseEventType
@@ -101,6 +102,17 @@ async def on_message(message):
     content = message.content
     if message.author.bot:
         return
+
+    regex_insta = re.match(r"https:\/\/(www.)instagram.com\/reel\/[a-zA-Z0-9_-]+", content)
+    if regex_insta:
+        if '?utm' in content:
+            content = content[:content.find('?utm')]
+        if 'kkinstagram' not in content:
+            content = content.replace('www.instagram', 'kkinstagram')
+        if 'kkinstagram' not in content:
+            content = content.replace('instagram', 'kkinstagram')
+        await message.edit(suppress=True)
+        await message.reply("Fixed your instagram link for ya. " + content, suppress_embeds=False)#, embed=emb)
 
     # If the message has an amazon link, and the amazon tag > 0
     if dbh.get_amazon_chat_override(message.guild.id) and len(dbh.get_amazon_tag(message.guild.id)) > 0:
