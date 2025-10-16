@@ -1,12 +1,15 @@
-import json
+import argparse
 import asyncio
+import json
+import re
+
 from datetime import datetime
 import discord
 from discord import app_commands
 from discord.abc import Snowflake
 import requests
-import argparse
-import re
+
+from typing import Optional
 
 from resources.DatabaseHandler import DatabaseHandler
 from resources.DatabaseHandler import DatabaseEventType
@@ -28,16 +31,16 @@ string_time = "%d-%m-%Y %H:%M:%S"
 dbh = DatabaseHandler()
 
 command = {}
-#MY_GUILD = discord.Object(id=1375334654642487306)
+MY_GUILD = discord.Object(id=1427555469341360189)
 
 class MyClient(discord.Client):
     def __init__(self, *, intents:discord.Intents):
         super().__init__(intents=intents)
         self.tree = app_commands.CommandTree(self)
 
-#    async def setup_hook(self):
-#        self.tree.copy_global_to(guild=MY_GUILD)
-#        await self.tree.sync(guild=MY_GUILD)
+    async def setup_hook(self):
+        self.tree.copy_global_to(guild=MY_GUILD)
+        await self.tree.sync(guild=MY_GUILD)
 
 def check_is_bot_owner(id:int) -> bool:
     return id == int(1064787494740176919)
@@ -317,15 +320,34 @@ async def setlog(interaction:discord.Interaction):
 @app_commands.describe(
     messages_to_delete='The number of messages we would like to delete'
 )
-async def clean(interaction:discord.Interaction, messages_to_delete:int):
+async def clean(interaction:discord.Interaction, messages_to_delete:Optional[int]=None, from_id:Optional[str]=None, to_id:Optional[str]=None, is_visible:Optional[bool]=False):
     """Bulk delete messages within the channel the command is sent to"""
-    messages = [message async for message in interaction.channel.history(limit=messages_to_delete)]
-    if messages[-1].created_at.timestamp() > messages[0].created_at.timestamp():
-        del messages[-1]
-    else:
-        del messages[0]
-    await interaction.channel.delete_messages(messages)
-    await interaction.response.send_message(f"Deleted {messages_to_delete} messages", ephemeral=True)
+    if messages_to_delete:
+        messages = [message async for message in interaction.channel.history(limit=messages_to_delete)]
+        if messages[-1].created_at.timestamp() > messages[0].created_at.timestamp():
+            del messages[-1]
+        else:
+            del messages[0]
+        await interaction.channel.delete_messages(messages)
+        await interaction.response.send_message(f"Deleted {messages_to_delete} messages", ephemeral=True)
+        return
+    if from_id and to_id:
+        from_id = int(from_id)
+        to_id = int(to_id)
+        messages = set()
+        is_between = False
+        async for message in interaction.channel.history(oldest_first=False):
+            if message.id == from_id:
+                is_between = True
+            if is_between and interaction.id != message.id:
+                messages.add(message)
+            if message.id == to_id:
+                is_between = False
+        messages = list(messages)
+        for msg in messages:
+            print(msg)
+        await interaction.response.send_message(f"Deleted {len(messages)} messages between {messages[0].created_at} and {messages[-1].created_at}.")
+        await interaction.channel.delete_messages(messages=messages)
 
 @tree.command()
 @app_commands.describe(
