@@ -38,6 +38,9 @@ class MyClient(discord.Client):
 #        self.tree.copy_global_to(guild=MY_GUILD)
 #        await self.tree.sync(guild=MY_GUILD)
 
+def check_is_bot_owner(id:int) -> bool:
+    return id == int(1064787494740176919)
+
 class custom_guild(Snowflake):
     def __init__(self, id):
         self.id = id
@@ -84,78 +87,102 @@ async def on_message(message):
     if type(message.channel) == discord.DMChannel:
         dbh.new_event(DatabaseEventType.message_sent, str(message.channel.id), str(message.channel.id), False, False, message.created_at)
         dbh.new_message(message.id, str(message.channel.id), str(message.channel.id), message.author.id, message.created_at, message.content.replace("\"", "'"))
+        message.reply("Sorry, but I do not currently support DMs. Please try again in the server.")
         return
+
     # Only note that a message was noticed, but no content about the message (just what guild, channel, and when)
     dbh.new_event(DatabaseEventType.message_received, message.guild.id, message.channel.id, False, False, message.created_at)
+
     # If the guild is logging, then store that message..
     if dbh.is_guild_logging(str(message.guild.id)):
         dbh.new_message(message.id, message.guild.id, message.channel.id, message.author.id, message.created_at, message.content.replace("\"", "'"))
+
+    # If the author of the message is a bot, ignore it;
     content = message.content
-    if not message.author.bot and dbh.get_amazon_chat_override(message.guild.id) and len(dbh.get_amazon_tag(message.guild.id)) > 0:
+    if message.author.bot:
+        return
+
+    # If the message has an amazon link, and the amazon tag > 0
+    if dbh.get_amazon_chat_override(message.guild.id) and len(dbh.get_amazon_tag(message.guild.id)) > 0:
         has_embed, message_resp = amazon_command(message.guild.id, message.content)
         if len(message_resp) > 0:
             await message.reply(message_resp)
             if has_embed:
                 await message.edit(suppress=True)
-    if len(content) > 0 and content[0] == '!':
-        command = content.split(' ')[0]
-        if 'amazon' == command.lower()[1:]:
-            has_embed, message_resp = amazon_command(message.guild.id, message.content)
-            if len(message_resp) > 0:
-                await message.reply(message_resp)
-                if has_embed:
-                    await message.edit(suppress=True)
-        elif 'restart' == content[1:len('restart')+1].lower() and message.author.id == int(1064787494740176919):
-            await message.reply("Bot will be restarting in 5 seconds..")
-            await asyncio.sleep(5)
-            await message.channel.send(f"{client.user.display_name} will now restart.")
-            await client.close()
+        return
+
+    # If the message doesn't contain any content (only embed), return
+    if len(content) == 0:
+        return
+
+    # If the message starts with '!' (str prefix) and has 'amazon' after it;
+    if content[0] != '!':
+        return
+
+    # Classic bot prefix commands (can't use old system to my knowledge/dismay)
+    command = content.split(' ')[0]
+    if 'amazon' == command.lower()[1:]:
+        has_embed, message_resp = amazon_command(message.guild.id, message.content)
+        if len(message_resp) > 0:
+            await message.reply(message_resp)
+            if has_embed:
+                await message.edit(suppress=True)
+        return
+    elif 'restart' == command.lower()[1:] and check_is_bot_owner(message.author.id):
+        await message.reply("Bot will be restarting in 5 seconds..")
+        await asyncio.sleep(5)
+        await message.channel.send(f"{client.user.display_name} will now restart.")
+        await client.close()
 
 @client.event
 async def on_message_edit(before, after):
-    if dbh.is_guild_logging(after.guild.id):
-        guild_channel = dbh.get_guild_logging_channel(after.guild.id)
-        if guild_channel is not None:
-            if before.content == after.content:
-                return
-            guild_channel = int(guild_channel)
-            name = before.author.nick
-            if type(name) is type(None):
-                name = before.author.name
-            name += "#%s" % before.author.discriminator
-            embed = discord.Embed(color=discord.Colour.orange())
-            embed.add_field(name="Message before edit", value=before.content, inline=False)
-            embed.add_field(name="Message after edit", value=after.content, inline=False)
-            if after.edited_at:
-                embed.set_footer(text="%s | %s" % (name, after.edited_at.strftime(string_time)))
-            channel = after.guild.get_channel(guild_channel)
-            await channel.send('', embed=embed)
-            timestamp = after.edited_at
-            if not timestamp:
-                timestamp = datetime.now()
-            dbh.new_event(DatabaseEventType.message_received, after.guild.id, after.channel.id, False, False, timestamp)
-            dbh.message_edit(after.id, after.content, timestamp)
+    if not dbh.is_guild_logging(str(after.guild.id), force_renew=True):
+        return
+    guild_channel = dbh.get_guild_logging_channel(after.guild.id)
+    if guild_channel is None:
+        return
+    if before.content == after.content:
+        return
+    guild_channel = int(guild_channel)
+    name = before.author.nick
+    if type(name) is type(None):
+        name = before.author.name
+    name += "#%s" % before.author.discriminator
+    embed = discord.Embed(color=discord.Colour.orange())
+    embed.add_field(name="Message before edit", value=before.content, inline=False)
+    embed.add_field(name="Message after edit", value=after.content, inline=False)
+    if after.edited_at:
+        embed.set_footer(text="%s | %s" % (name, after.edited_at.strftime(string_time)))
+    channel = after.guild.get_channel(guild_channel)
+    await channel.send('', embed=embed)
+    timestamp = after.edited_at
+    if not timestamp:
+        timestamp = datetime.now()
+    dbh.new_event(DatabaseEventType.message_received, after.guild.id, after.channel.id, False, False, timestamp)
+    dbh.message_edit(after.id, after.content, timestamp)
 
 @client.event
 async def on_message_delete(message):
-    if dbh.is_guild_logging(str(message.guild.id), force_renew=True):
-        guild_channel = dbh.get_guild_logging_channel(message.guild.id)
-        if guild_channel is not None:
-            name = message.author.name
-            if message.author.discriminator != "0":
-                name += "#%s" % message.author.discriminator
-            embed = discord.Embed(color=delete_color)
-            embed.add_field(name="Deleted Message", value=message.content, inline=False)
-            embed.add_field(name="Message ID", value=message.id, inline=False)
-            embed.add_field(name="Channel", value=message.channel.mention)
-            nick = message.author.nick
-            if nick == None:
-                nick = ""
-            embed.add_field(name="Nickname", value=nick)
-            embed.set_footer(text=f"{name} | {datetime.now().strftime(string_time)}")
-            channel = await message.guild.fetch_channel(guild_channel)
-            await channel.send('', embed=embed)
-            dbh.new_event(DatabaseEventType.message_deleted, message.guild.id, message.channel.id, False, False, datetime.now())
+    if not dbh.is_guild_logging(str(message.guild.id), force_renew=True):
+        return
+    guild_channel = dbh.get_guild_logging_channel(message.guild.id)
+    if guild_channel is None:
+        return
+    name = message.author.name
+    if message.author.discriminator != "0":
+        name += "#%s" % message.author.discriminator
+    embed = discord.Embed(color=delete_color)
+    embed.add_field(name="Deleted Message", value=message.content, inline=False)
+    embed.add_field(name="Message ID", value=message.id, inline=False)
+    embed.add_field(name="Channel", value=message.channel.mention)
+    nick = message.author.nick
+    if nick == None:
+        nick = ""
+    embed.add_field(name="Nickname", value=nick)
+    embed.set_footer(text=f"{name} | {datetime.now().strftime(string_time)}")
+    channel = await message.guild.fetch_channel(guild_channel)
+    await channel.send('', embed=embed)
+    dbh.new_event(DatabaseEventType.message_deleted, message.guild.id, message.channel.id, False, False, datetime.now())
 
 # @client.event
 # async def on_raw_message_delete(payload):
@@ -198,35 +225,39 @@ async def on_message_delete(message):
 
 @client.event
 async def on_member_join(member):
-    if dbh.is_guild_logging(member.guild.id, force_renew=True):
-        guild_channel = dbh.get_guild_logging_channel(member.guild.id)
-        if guild_channel is not None:
-            guild_channel = int(guild_channel)
-            name = member.nick
-            if type(name) is type(None):
-                name = member.name
-            name += "#%s" % member.discriminator
-            embed = discord.Embed(color=log_color, title="User joined")
-            embed.set_footer(text="%s | %s" % (name, member.joined_at.strftime(string_time)))
-            channel = member.guild.get_channel(guild_channel)
-            await channel.send('', embed=embed)
-            dbh.new_event(DatabaseEventType.member_joined, member.guild.id, "", False, False, member.joined_at)
+    if not dbh.is_guild_logging(member.guild.id, force_renew=True):
+        return
+    guild_channel = dbh.get_guild_logging_channel(member.guild.id)
+    if guild_channel is None:
+        return
+    guild_channel = int(guild_channel)
+    name = member.nick
+    if type(name) is type(None):
+        name = member.name
+    name += "#%s" % member.discriminator
+    embed = discord.Embed(color=log_color, title="User joined")
+    embed.set_footer(text="%s | %s" % (name, member.joined_at.strftime(string_time)))
+    channel = member.guild.get_channel(guild_channel)
+    await channel.send('', embed=embed)
+    dbh.new_event(DatabaseEventType.member_joined, member.guild.id, "", False, False, member.joined_at)
 
 @client.event
 async def on_member_remove(member):
-    if dbh.is_guild_logging(member.guild.id, force_renew=True):
-        guild_channel = dbh.get_guild_logging_channel(member.guild.id)
-        if guild_channel is not None:
-            guild_channel = int(guild_channel)
-            name = member.nick
-            if type(name) is type(None):
-                name = member.name
-            name += "#%s" % member.discriminator
-            embed = discord.Embed(color=delete_color, title="User left server")
-            embed.set_footer(text=name)
-            channel = member.guild.get_channel(guild_channel)
-            await channel.send('', embed=embed)
-            dbh.new_event(DatabaseEventType.member_banned, member.guild.id, "", False, False, datetime.now())
+    if not dbh.is_guild_logging(member.guild.id, force_renew=True):
+        return
+    guild_channel = dbh.get_guild_logging_channel(member.guild.id)
+    if guild_channel is None:
+        return
+    guild_channel = int(guild_channel)
+    name = member.nick
+    if type(name) is type(None):
+        name = member.name
+    name += "#%s" % member.discriminator
+    embed = discord.Embed(color=delete_color, title="User left server")
+    embed.set_footer(text=name)
+    channel = member.guild.get_channel(guild_channel)
+    await channel.send('', embed=embed)
+    dbh.new_event(DatabaseEventType.member_banned, member.guild.id, "", False, False, datetime.now())
 
 @client.event
 async def on_guild_join(guild):
