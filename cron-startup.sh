@@ -4,7 +4,7 @@ proj_dir=$(dirname "$0")
 if [[ "$(echo -n $proj_dir | wc -m)" -eq 1 ]]; then
     proj_dir="$(pwd)"
 fi
-proj_name="Espresso"
+proj_name="espresso"
 if [[ -z "$(echo $proj_dir | grep $proj_name)" ]]; then
     proj_dir=$proj_dir/$proj_name
 fi
