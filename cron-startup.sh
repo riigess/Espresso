@@ -37,16 +37,7 @@ direct="$proj_dir"
 if [[ -z "$(echo $direct | grep $proj_name)" ]]; then
     direct="$proj_dir/$proj_name"
 fi
-psresp=""
-if [[ "$(uname)" == "Darwin" ]]; then
-    psresp="$(ps -a)"
-elif [[ "$(uname)" == "Linux" ]]; then
-    psresp="$(ps -auxe)"
-else
-    echo "Windows is currently unsupported...exiting"
-    exit -1
-fi
-if [[ -z "$(echo -n $psresp | grep "python3" | grep "PWD=$direct" | grep -v grep)" ]]; then
+if [[ -z "$(ps -auxe | grep "python3" | grep "PWD=$direct" | grep -v grep)" ]]; then
     runner
 else
     echo "Already running"
